@@ -1,0 +1,136 @@
+#define left_sensor 12
+#define right_sensor 13
+
+// AnalogIn
+const int IR_l = 4;
+const int IR_r = 2;
+bool read_l = LOW;
+bool read_r = LOW;
+bool RIGHT = false;
+bool LEFT = false;
+bool GO = false;
+
+//`Motor left
+const int motorPin3  = 11;  // Pin 2 of L293
+const int motorPin4  = 3;  // Pin 4 of L293
+//Motor right
+const int motorPin1  = 10; // Pin  15 of L293
+const int motorPin2  = 9;  // Pin  10 of L293
+
+void turnleft() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, HIGH);
+  digitalWrite(motorPin3, LOW);
+  digitalWrite(motorPin4, LOW);
+  //delay(400);
+}
+
+void turnright() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, LOW);
+  digitalWrite(motorPin3, LOW);
+  digitalWrite(motorPin4, HIGH);
+  //delay(400);
+}
+
+void carstop() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, LOW);
+  digitalWrite(motorPin3, LOW);
+  digitalWrite(motorPin4, LOW);
+}
+
+void backward() {
+  analogWrite(motorPin1, 200);
+  digitalWrite(motorPin2, LOW);
+  analogWrite(motorPin3, 200);
+  digitalWrite(motorPin4, LOW);
+}
+
+void forward() {
+  digitalWrite(motorPin1, LOW);
+  analogWrite(motorPin2, 200);
+  digitalWrite(motorPin3, LOW);
+  analogWrite(motorPin4, 200);
+}
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+  pinMode(IR_l, INPUT);
+  pinMode(IR_r, INPUT);
+
+  pinMode(motorPin1, OUTPUT);
+  pinMode(motorPin2, OUTPUT);
+  pinMode(motorPin3, OUTPUT);
+  pinMode(motorPin4, OUTPUT);
+
+
+  // pinMode(left_sensor,INPUT_PULLUP);
+  // pinMode(right_sensor,INPUT_PULLUP);
+
+}
+
+void loop() {
+
+  // IR sensor
+  // Reading from two IR sensor
+  // When black return HIGH, else return LOW
+  /*
+    int i;
+    read_l = 0;
+    read_r = 0;
+    for(i=0;i<=3;i++){
+     read_l += digitalRead(IR_l);
+     read_r += digitalRead(IR_r);
+    }
+    read_l -= 2;
+    read_r -= 2;*/
+  read_l = digitalRead(IR_l);
+  read_r = digitalRead(IR_r);
+  // Check the direction
+  if (!read_l&& !read_r) {
+    GO = true;
+    LEFT = false;
+    RIGHT = false;
+  }
+  else if (read_l && !read_r) {
+    GO = false;
+    LEFT = true;
+    RIGHT = false;
+  }
+  else if (!read_l && read_r) {
+    GO = false;
+    LEFT = false;
+    RIGHT = true;
+  }
+
+  if (GO) {
+    forward();
+  }
+  else if (LEFT) {
+    turnleft();
+  }
+  else if (RIGHT) {
+    turnright();
+  }
+
+  //    int L=digitalRead(left_sensor);
+  //    int R=digitalRead(right_sensor);
+  //
+  //    delay(500);
+  //
+  //    if (L==0){
+  //      Serial.println("Left Obstacle detected!");
+  //    }
+  //    else{
+  //      turnleft();
+  //    }
+  //    if (R==0){
+  //      Serial.println("Right Obstacle detected!");
+  //    }
+  //    else {
+  //      turnright();
+  //    }
+  //
+}
