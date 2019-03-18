@@ -251,6 +251,7 @@ void loop() {
     //Serial.println();
     if (red < blue && red < green && red < 60 && (red < 0.5 * green or red < 0.5 * blue) ) //needs to tune the parameters here of RBG relations, use combination to find the optimal logic
     {
+      follow_line = false;
       Serial.println(" - (Red Color)");
       if (flag_state == up)
         flag_down();
@@ -258,11 +259,13 @@ void loop() {
 
     else if (green < red && green < blue)        ////needs to tune the parameters here of RBG relations
     {
+      follow_line = false;
       Serial.println(" - (Green Color)");
       if (flag_state == down )
         flag_up();
     }
     else {
+      follow_line = true;
       Serial.println();
     }
   }
