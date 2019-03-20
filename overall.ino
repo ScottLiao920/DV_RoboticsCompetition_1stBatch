@@ -7,20 +7,20 @@
 #define right_sensor A1
 
 //define pins for rfid and emitter
-#define EMITTER 1
+#define RFID 4
 IRsend irsend;
-SoftwareSerial Rfid = SoftwareSerial(EMITTER, 0);
+SoftwareSerial Rfid = SoftwareSerial(RFID, 0);
 
 bool follow_line = true;
 // AnalogIn
-const int IR_l = 4;
-const int IR_r = 2;
+#define IR_l A2
+#define IR_r A3
 bool read_l = LOW;
 bool read_r = LOW;
 bool RIGHT = false;
 bool LEFT = false;
 bool GO = false;
-bool tmp = true;
+bool tmp = false;
 
 //`Motor left
 const int motorPin3  = 11;  // Pin 2 of L293
@@ -45,7 +45,7 @@ const int s0 = 13;
 const int s1 = 12;
 const int s2 = 8;
 const int s3 = 7;
-const int out = 5;
+const int out = 2;
 Servo myservo;
 
 int red = 0;
@@ -90,9 +90,11 @@ void backward() {
 
 void forward() {
   digitalWrite(motorPin1, LOW);
-  analogWrite(motorPin2, 180);
+  digitalWrite(motorPin2, HIGH);
+  //analogWrite(motorPin2, 180);
   digitalWrite(motorPin3, LOW);
-  analogWrite(motorPin4, 180);
+  //analogWrite(motorPin4, 180);
+  digitalWrite(motorPin4, HIGH);
 }
 
 void detect_color()
@@ -157,10 +159,10 @@ void setup() {
 }
 
 void loop() {
-  // IR sensor
-  // Reading from two IR sensor
-  // When black return HIGH, else return LOW
-  // carstop();
+  Serial.println(cur_state);
+  //  // IR sensor
+  //  // Reading from two IR sensor
+  //  // When black return HIGH, else return LOW
   if (follow_line) {
     int i;
     int line_l = 0;
@@ -179,23 +181,34 @@ void loop() {
       LEFT = false;
       RIGHT = false;
     }
-    else if (read_l && !read_r) {
+    else if (!read_l && read_r) {
       GO = false;
       LEFT = true;
       RIGHT = false;
     }
-    else if (!read_l && read_r) {
+    else if (read_l && !read_r) {
       GO = false;
       LEFT = false;
       RIGHT = true;
     }
-
+    else {
+      // this
+      GO = true;
+      LEFT = false;
+      RIGHT = false;
+    }
     if (GO) {
       forward();
+      //      Serial.print(GO);
+      //      Serial.print(LEFT);
+      //      Serial.print(RIGHT);
       Serial.println("F");
     }
     else if (LEFT) {
       turnleft();
+      //      Serial.print(GO);
+      //      Serial.print(LEFT);
+      //      Serial.print(RIGHT);
       Serial.println("L");
     }
     else if (RIGHT) {
@@ -203,6 +216,8 @@ void loop() {
       Serial.println("R");
     }
   }
+
+
   if (cur_state == 0) {
     int L = digitalRead(left_sensor);
     int R = digitalRead(right_sensor);
@@ -211,25 +226,34 @@ void loop() {
     //      Serial.println("f");
     //    }
     // for testing
-    if (L || R) {
+    if (not L || not R) {
       follow_line = false;
-      // cur_state ++;
-      if ( L != 0) {
+      tmp = true;
+      Serial.println(tmp);
+      Serial.println(cur_state);
+      if ( L == 0) {
         turnleft();
+        Serial.print(L);
+        Serial.print(R);
         Serial.println("L");
       }
-      if (R != 0) {
+      else if (R == 0) {
         turnright();
         Serial.println("R");
       }
-      if (R != 0 && L != 0) {
+      else if (R == 0 && L == 0) {
         forward();
         Serial.println("f");
       }
     }
+    else if (tmp == true) {
+      cur_state ++;
+      follow_line = true;
+    }
   }
-  // rfid part
 
+
+  // rfid part
   if (Rfid.available() > 0 && cur_state == 1) {
     // as long as there is data available...
     follow_line = false;
@@ -237,15 +261,18 @@ void loop() {
     Serial.println("RFID if");
     while (Rfid.available() > 0 ) {
       carstop();
-      Serial.println("RFID detect!");
       unsigned long r = Rfid.read();
+      Serial.print("RFID detect!");
+      Serial.println(r);
       irsend.sendRC5(r, 6); //send 0x0 code (8 bits)
       delay(200);
     }
     forward();
     delay(500);
+
     follow_line = true;
   }
+
 
   //color detect
   if (cur_state == 2) {
@@ -268,7 +295,6 @@ void loop() {
       if (flag_state == up)
         flag_down();
     }
-
     else if (green < red && green < blue)        ////needs to tune the parameters here of RBG relations
     {
       follow_line = false;
