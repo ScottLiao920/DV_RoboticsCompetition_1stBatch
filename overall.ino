@@ -127,6 +127,18 @@ void flag_down() {
   }
   Flag_state flag_state = down;
 }
+void fuck_turnright() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin4, HIGH);
+  digitalWrite(motorPin3, LOW);
+  analogWrite(motorPin2, 100);
+}
+void fuck_turnleft() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, HIGH);
+  digitalWrite(motorPin3, LOW);
+  analogWrite(motorPin4, 100);
+}
 void setup() {
   //IR setup
   Serial.begin(9600);
@@ -159,7 +171,29 @@ void setup() {
 }
 
 void loop() {
-  Serial.println(cur_state);
+  //Serial.println(cur_state);
+  // rfid part
+  if (cur_state == 2) {
+    if (Rfid.available() > 0) {
+      // as long as there is data available... && cur_state == 1
+      follow_line = false;
+      cur_state ++;
+      Serial.println("RFID if");
+      while (Rfid.available() > 0 ) {
+        carstop();
+        unsigned long r = Rfid.read();
+        delay(50);
+        Serial.print("RFID detect!");
+        Serial.println(r);
+        irsend.sendRC5(r, 6); //send 0x0 code (8 bits)
+        delay(200);
+      }
+      //forward();
+      delay(500);
+      follow_line = true;
+    }
+  }
+
   //  // IR sensor
   //  // Reading from two IR sensor
   //  // When black return HIGH, else return LOW
@@ -170,6 +204,7 @@ void loop() {
     for (i = 0; i <= 3; i++) {
       line_l += digitalRead(IR_l);
       line_r += digitalRead(IR_r);
+      delay(10);
     }
     read_l = (line_l > 2);
     read_r = (line_r > 2);
@@ -181,21 +216,26 @@ void loop() {
       LEFT = false;
       RIGHT = false;
     }
-    else if (!read_l && read_r) {
+    else if (read_l && !read_r) {
       GO = false;
       LEFT = true;
       RIGHT = false;
     }
-    else if (read_l && !read_r) {
+    else if (!read_l && read_r) {
       GO = false;
       LEFT = false;
       RIGHT = true;
     }
-    else {
-      // this
-      GO = true;
+    else if (cur_state == 1) {
+      // this need to change according to your strategy
+      GO = false;
       LEFT = false;
       RIGHT = false;
+    }
+    else {
+      GO = GO;
+      LEFT = LEFT;
+      RIGHT = RIGHT;
     }
     if (GO) {
       forward();
@@ -215,67 +255,82 @@ void loop() {
       turnright();
       Serial.println("R");
     }
+    else {
+      carstop();
+      Serial.println("S");
+    }
+  }
+  if (cur_state == 0) {
+    int L = 0;
+    int R = 0;
+    for (int i = 0; i <= 3; i++) {
+      L += digitalRead(left_sensor);
+      R += digitalRead(right_sensor);
+      delay(10);
+    }
+    L = max(L - 3, 0);
+    R = max(R - 3, 0);
+    if (not L and not R) {
+      cur_state ++;
+    }
   }
 
-
-  if (cur_state == 0) {
-    int L = digitalRead(left_sensor);
-    int R = digitalRead(right_sensor);
-    //    if (L == 0 && R == 0) {
+  if (cur_state == 1) {
+    int L = 0;
+    int R = 0;
+    for (int i = 0; i <= 2; i++) {
+      L += digitalRead(left_sensor);
+      R += digitalRead(right_sensor);
+      delay(10);
+    }
+    L = max(L - 2, 0);
+    R = max(R - 2, 0);
+    Serial.println(L);
+    Serial.println(R);
+    //    if (L != 0 && R != 0) {
     //      forward();
     //      Serial.println("f");
     //    }
     // for testing
-    if (not L || not R) {
+    if (L == 0 || R == 0) {
       follow_line = false;
       tmp = true;
-      Serial.println(tmp);
-      Serial.println(cur_state);
-      if ( L == 0) {
-        turnleft();
-        Serial.print(L);
-        Serial.print(R);
-        Serial.println("L");
+      //Serial.println(tmp);
+      //Serial.println(cur_state);
+      if ( L != 0) {
+        fuck_turnleft();
+        delay(1500);
+        Serial.println("Obstacle, L");
       }
-      else if (R == 0) {
-        turnright();
-        Serial.println("R");
+      else if (R != 0) {
+        fuck_turnright();
+        delay(1400);
+
+        Serial.println("Obstacle, R");
       }
       else if (R == 0 && L == 0) {
         forward();
-        Serial.println("f");
+        Serial.println("Obstacle, f");
       }
     }
     else if (tmp == true) {
-      cur_state ++;
-      follow_line = true;
-    }
-  }
-
-
-  // rfid part
-  if (Rfid.available() > 0 && cur_state == 1) {
-    // as long as there is data available...
-    follow_line = false;
-    cur_state ++;
-    Serial.println("RFID if");
-    while (Rfid.available() > 0 ) {
       carstop();
-      unsigned long r = Rfid.read();
-      Serial.print("RFID detect!");
-      Serial.println(r);
-      irsend.sendRC5(r, 6); //send 0x0 code (8 bits)
-      delay(200);
+      for (int i = 0; i <= 9; i++) {
+        L += digitalRead(left_sensor);
+        R += digitalRead(right_sensor);
+        delay(10);
+      }
+      L = max(L - 8, 0);
+      R = max(R - 8, 0);
+      if (L == 0 and R != 0) {
+        //cur_state ++;
+        follow_line = true;
+      }
     }
-    forward();
-    delay(500);
-
-    follow_line = true;
   }
-
 
   //color detect
-  if (cur_state == 2) {
+  if (cur_state == 3) {
     //initialize and flag up!
     Flag_state flag_state = up;
     flag_up();
@@ -290,20 +345,17 @@ void loop() {
     //Serial.println();
     if (red < blue && red < green && red < 60 && (red < 0.5 * green or red < 0.5 * blue) ) //needs to tune the parameters here of RBG relations, use combination to find the optimal logic
     {
-      follow_line = false;
       Serial.println(" - (Red Color)");
       if (flag_state == up)
         flag_down();
     }
     else if (green < red && green < blue)        ////needs to tune the parameters here of RBG relations
     {
-      follow_line = false;
       Serial.println(" - (Green Color)");
       if (flag_state == down )
         flag_up();
     }
     else {
-      follow_line = true;
       Serial.println();
     }
   }
