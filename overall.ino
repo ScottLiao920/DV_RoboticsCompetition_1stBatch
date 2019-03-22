@@ -2,6 +2,30 @@
 #include<SoftwareSerial.h>
 #include<IRremote.h>
 
+/* pins setup:
+    Sensors             Arduino
+    ------------        -------
+    VCC                 5V
+    GND                 GND
+    S0(Color Sensor)    13
+    S1(Color Sensor)    12
+    S2(Color Sensor)    8
+    S3(Color Sensor)    7
+    OUT(Color Sensor)   2
+    LED                 5V
+    RFID                4
+    IR left             A0
+    IR Right            A1
+    obstacle left       A2
+    obstacle right      A3
+    motor driver pin2   11
+    motor driver pin7   6
+    motor driver pin10  9
+    motor driver pin15  10
+    servo for flag      5
+    IR emitter          3
+*/
+
 // define pins for infared obstable detector
 #define left_sensor A0
 #define right_sensor A1
@@ -29,18 +53,7 @@ const int motorPin4  = 6;  // Pin 4 of L293
 const int motorPin1  = 10; // Pin  15 of L293
 const int motorPin2  = 9;  // Pin  10 of L293
 
-/* TCS230 color sensor pins setup:
-    Color Sensor  Arduino
-    ------------  -------
-    VCC           5V
-    GND           GND
-    S0            13
-    S1            12
-    S2            6
-    S3            7
-    OUT           5
-    LED           5V
-*/
+
 const int s0 = 13;
 const int s1 = 12;
 const int s2 = 8;
@@ -51,6 +64,7 @@ Servo myservo;
 int red = 0;
 int green = 0;
 int blue = 0;
+int need_change = 0;
 typedef enum Flag_state {
   up, down
 } flag_state;
@@ -111,19 +125,19 @@ void detect_color()
   green = pulseIn(out, digitalRead(out) == HIGH ? LOW : HIGH);
 }
 
-void flag_up() {
+void flag_down() {
   int pos = 0; //servo position variable
-  for (pos = 0; pos <= 180; pos += 1) {
+  for (pos = 0; pos <= 80; pos += 1) {
     myservo.write(pos);
-    delay(10);
+    delay(5);
   }
   Flag_state flag_state = up;
 }
-void flag_down() {
-  int pos = 180; //servo position variable
-  for (pos = 180; pos >= 0; pos -= 1) {
+void flag_up() {
+  int pos; //servo position variable
+  for (pos = 80; pos >= 0; pos -= 1) {
     myservo.write(pos);
-    delay(10);
+    delay(5);
   }
   Flag_state flag_state = down;
 }
@@ -166,14 +180,29 @@ void setup() {
   pinMode(out, INPUT);
   digitalWrite(s0, HIGH);
   digitalWrite(s1, HIGH);
-  myservo.attach(8);
-  //leave pin 8 for servo
+  myservo.attach(5);
+  flag_up();
+  //leave pin 5 for servo
 }
 
 void loop() {
-  //Serial.println(cur_state);
+  Serial.println(cur_state);
+
+  //get readings from ir
+  int i;
+  int line_l = 0;
+  int line_r = 0;
+  for (i = 0; i <= 3; i++) {
+    line_l += digitalRead(IR_l);
+    line_r += digitalRead(IR_r);
+    delay(10);
+  }
+  read_l = (line_l > 2);
+  read_r = (line_r > 2);
+
   // rfid part
-  if (cur_state == 2) {
+  if (cur_state == 2 and (read_l and read_r)) {
+    carstop();
     if (Rfid.available() > 0) {
       // as long as there is data available... && cur_state == 1
       follow_line = false;
@@ -188,26 +217,18 @@ void loop() {
         irsend.sendRC5(r, 6); //send 0x0 code (8 bits)
         delay(200);
       }
-      //forward();
+      forward();
       delay(500);
       follow_line = true;
     }
+    delay(1000);
   }
 
-  //  // IR sensor
-  //  // Reading from two IR sensor
-  //  // When black return HIGH, else return LOW
+
+  // IR sensor
+  // Reading from two IR sensor
+  // When black return HIGH, else return LOW
   if (follow_line) {
-    int i;
-    int line_l = 0;
-    int line_r = 0;
-    for (i = 0; i <= 3; i++) {
-      line_l += digitalRead(IR_l);
-      line_r += digitalRead(IR_r);
-      delay(10);
-    }
-    read_l = (line_l > 2);
-    read_r = (line_r > 2);
     //    read_l = digitalRead(IR_l);
     //    read_r = digitalRead(IR_r);
     // Check the direction
@@ -260,6 +281,8 @@ void loop() {
       Serial.println("S");
     }
   }
+
+  //obstacle avoidance
   if (cur_state == 0) {
     int L = 0;
     int R = 0;
@@ -274,7 +297,6 @@ void loop() {
       cur_state ++;
     }
   }
-
   if (cur_state == 1) {
     int L = 0;
     int R = 0;
@@ -322,19 +344,29 @@ void loop() {
       }
       L = max(L - 8, 0);
       R = max(R - 8, 0);
-      if (L == 0 and R != 0) {
-        //cur_state ++;
+      if (L != 0 and R != 0) {
+        cur_state ++;
         follow_line = true;
       }
     }
   }
 
   //color detect
-  if (cur_state == 3) {
+  if (cur_state == 3 ) {
     //initialize and flag up!
     Flag_state flag_state = up;
-    flag_up();
-
+    if (need_change == 0) {
+      flag_up();
+      Serial.print("Up");
+    }
+    else if (need_change == 1) {
+      Serial.print("down!");
+      flag_state = down;
+    }
+    else if (need_change == 2) {
+      Serial.print("Up");
+      flag_state = up;
+    }
     detect_color();
     Serial.print("R Intensity:");
     Serial.print(red, DEC);
@@ -342,18 +374,22 @@ void loop() {
     Serial.print(green, DEC);
     Serial.print(" B Intensity : ");
     Serial.print(blue, DEC);
-    //Serial.println();
+    Serial.print(need_change);
     if (red < blue && red < green && red < 60 && (red < 0.5 * green or red < 0.5 * blue) ) //needs to tune the parameters here of RBG relations, use combination to find the optimal logic
     {
       Serial.println(" - (Red Color)");
-      if (flag_state == up)
+      if (flag_state == up) {
         flag_down();
+        need_change = 1;
+      }
     }
     else if (green < red && green < blue)        ////needs to tune the parameters here of RBG relations
     {
       Serial.println(" - (Green Color)");
-      if (flag_state == down )
+      if (flag_state == down) {
         flag_up();
+        need_change = 2;
+      }
     }
     else {
       Serial.println();
