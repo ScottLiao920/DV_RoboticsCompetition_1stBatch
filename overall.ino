@@ -14,10 +14,10 @@
     OUT(Color Sensor)   2
     LED                 5V
     RFID                4
-    IR left             A0
-    IR Right            A1
-    obstacle left       A2
-    obstacle right      A3
+    IR left             A2
+    IR Right            A3
+    obstacle left       A0
+    obstacle right      A1
     motor driver pin2   11
     motor driver pin7   6
     motor driver pin10  9
@@ -47,8 +47,8 @@ bool GO = false;
 bool tmp = false;
 
 //`Motor left
-const int motorPin3  = 11;  // Pin 2 of L293
-const int motorPin4  = 6;  // Pin 4 of L293
+const int motorPin3  = 6;  // Pin 2 of L293
+const int motorPin4  = 11;  // Pin 4 of L293
 //Motor right
 const int motorPin1  = 10; // Pin  15 of L293
 const int motorPin2  = 9;  // Pin  10 of L293
@@ -186,9 +186,9 @@ void setup() {
 }
 
 void loop() {
-  Serial.println(cur_state);
-
-  //get readings from ir
+  //  Serial.println(cur_state);
+  //
+  //  //get readings from ir
   int i;
   int line_l = 0;
   int line_r = 0;
@@ -208,7 +208,8 @@ void loop() {
       follow_line = false;
       cur_state ++;
       Serial.println("RFID if");
-      while (Rfid.available() > 0 ) {
+      int count = 0;
+      while (Rfid.available() > 0 and count < 40 ) {
         carstop();
         unsigned long r = Rfid.read();
         delay(50);
@@ -216,6 +217,7 @@ void loop() {
         Serial.println(r);
         irsend.sendRC5(r, 6); //send 0x0 code (8 bits)
         delay(200);
+        count++;
       }
       forward();
       delay(500);
@@ -227,7 +229,7 @@ void loop() {
 
   // IR sensor
   // Reading from two IR sensor
-  // When black return HIGH, else return LOW
+  // When black return high, else return low
   if (follow_line) {
     //    read_l = digitalRead(IR_l);
     //    read_r = digitalRead(IR_r);
@@ -281,6 +283,7 @@ void loop() {
       Serial.println("S");
     }
   }
+
 
   //obstacle avoidance
   if (cur_state == 0) {
